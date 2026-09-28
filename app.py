@@ -136,6 +136,31 @@ def strip_duplicate_safety(answer, safety_message):
     return answer
 
 
+def clean_source_label(value):
+    """Clean display-only source labels without changing retrieval data."""
+    value = str(value or "").strip()
+
+    # Normalize common mojibake / punctuation artifacts seen in imported docs.
+    replacements = {
+        "â€”": "—",
+        "â€“": "–",
+        "â€˜": "‘",
+        "â€™": "’",
+        "â€œ": "“",
+        "â€": "”",
+        "′": "'",
+        "`": "",
+    }
+    for bad, good in replacements.items():
+        value = value.replace(bad, good)
+
+    # Collapse repeated whitespace / isolated punctuation fragments.
+    value = re.sub(r"\s+", " ", value)
+    value = re.sub(r"(?:\s*['‘’]+\s*){2,}", " ", value)
+    value = re.sub(r"\s+>", " >", value)
+    return value.strip(" -–—>'‘’")
+
+
 def render_sources(citations):
     with st.container(border=True):
         st.subheader("Sources")
@@ -144,10 +169,18 @@ def render_sources(citations):
             st.caption("No sources were returned.")
             return
 
-        for index, citation in enumerate(citations, start=1):
-            document = citation.get("document") or "Unknown document"
-            section = citation.get("section") or "Unknown section"
-            source = citation.get("source") or "Unknown source"
+        visible_citations = list(citations)[:3]
+
+        for index, citation in enumerate(visible_citations, start=1):
+            document = clean_source_label(
+                citation.get("document") or "Unknown document"
+            )
+            section = clean_source_label(
+                citation.get("section") or "Unknown section"
+            )
+            source = clean_source_label(
+                citation.get("source") or "Unknown source"
+            )
 
             with st.expander(f"{index}. {document} — {section}"):
                 left, right = st.columns(2)
@@ -163,10 +196,21 @@ def render_sources(citations):
 
                 if citation.get("excerpt"):
                     st.markdown("**Relevant excerpt**")
-                    st.caption(citation["excerpt"])
+                    st.caption(
+                        clean_source_label(citation["excerpt"])
+                    )
 
                 if citation.get("source_url"):
-                    st.link_button("View original source", citation["source_url"])
+                    st.link_button(
+                        "View original source",
+                        citation["source_url"],
+                    )
+
+        if len(citations) > len(visible_citations):
+            st.caption(
+                f"Showing top {len(visible_citations)} of "
+                f"{len(citations)} retrieved sources."
+            )
 
 
 
