@@ -1,6 +1,7 @@
 """Professional Streamlit demo for the existing GRBL CNC AI orchestrator."""
 
 import sys
+import re
 from pathlib import Path
 
 import streamlit as st
@@ -104,6 +105,37 @@ def render_sidebar(assistant):
         )
 
 
+def safe_markdown_text(value):
+    """Preserve GRBL $-settings in Streamlit Markdown.
+
+    Streamlit treats dollar signs as LaTeX delimiters. Escape unescaped dollar
+    signs so settings such as $100, $101, $$, and $G render literally.
+    """
+    value = str(value or "")
+    return re.sub(r"(?<!\\)\$", r"\\$", value)
+
+
+def strip_duplicate_safety(answer, safety_message):
+    """Avoid showing the same safety notice twice in the UI."""
+    answer = str(answer or "").strip()
+    safety_message = str(safety_message or "").strip()
+
+    if not answer or not safety_message:
+        return answer
+
+    prefixes = (
+        safety_message,
+        f"SAFETY: {safety_message}",
+    )
+
+    for prefix in prefixes:
+        if answer.startswith(prefix):
+            answer = answer[len(prefix):].lstrip(" \n:-")
+            break
+
+    return answer
+
+
 def render_sources(citations):
     with st.container(border=True):
         st.subheader("Sources")
@@ -181,7 +213,12 @@ def render_response(response):
 
     with st.container(border=True):
         st.subheader("Answer")
-        st.markdown(response.get("answer") or "No answer was returned.")
+        raw_answer = response.get("answer") or "No answer was returned."
+        clean_answer = strip_duplicate_safety(
+            raw_answer,
+            safety.get("message", ""),
+        )
+        st.markdown(safe_markdown_text(clean_answer))
 
     st.write("")
     render_sources(response.get("citations", []))
@@ -271,13 +308,17 @@ def main():
                 with st.spinner(loading_text):
                     response = assistant.ask(question)
 
-                st.session_state["history"].insert(
-                    0,
-                    {
-                        "question": question.strip(),
-                        "response": response,
-                    },
-                )
+                new_item = {
+                    "question": question.strip(),
+                    "response": response,
+                }
+
+                history = st.session_state["history"]
+                if not history or history[0].get("question") != new_item["question"]:
+                    history.insert(0, new_item)
+                else:
+                    # Refresh the latest answer without adding a duplicate row.
+                    history[0] = new_item
 
                 st.rerun()
 
@@ -300,7 +341,9 @@ def main():
         st.subheader("Latest Answer")
 
         latest = history[0]
-        st.markdown(f"**Question:** {latest['question']}")
+        st.markdown(
+            f"**Question:** {safe_markdown_text(latest['question'])}"
+        )
         render_response(latest["response"])
 
         if len(history) > 1:
