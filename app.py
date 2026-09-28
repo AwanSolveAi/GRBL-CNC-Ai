@@ -106,13 +106,34 @@ def render_sidebar(assistant):
 
 
 def safe_markdown_text(value):
-    """Preserve GRBL $-settings in Streamlit Markdown.
+    """Render GRBL $ commands/settings literally without visible backslashes.
 
-    Streamlit treats dollar signs as LaTeX delimiters. Escape unescaped dollar
-    signs so settings such as $100, $101, $$, and $G render literally.
+    Streamlit Markdown can interpret dollar signs as LaTeX delimiters. Wrap
+    GRBL-style dollar tokens in inline-code spans instead, while leaving text
+    already inside backticks unchanged.
     """
     value = str(value or "")
-    return re.sub(r"(?<!\\)\$", r"\\$", value)
+
+    parts = re.split(r"(`[^`]*`)", value)
+
+    for index, part in enumerate(parts):
+        if index % 2 == 1:
+            continue
+
+        # GRBL settings / status commands: $100, $101, $G, $H, $X, $$, etc.
+        part = re.sub(
+            r"(?<!\\)(\$\$|\$\d{1,3}\??|\$[A-Za-z](?:=[^\s,.;:]*)?\??)",
+            r"`\1`",
+            part,
+        )
+        parts[index] = part
+
+    return "".join(parts)
+
+
+def safe_expander_label(value):
+    """Keep dollar signs literal in Streamlit expander labels."""
+    return str(value or "").replace("$", r"\$")
 
 
 def strip_duplicate_safety(answer, safety_message):
@@ -182,7 +203,10 @@ def render_sources(citations):
                 citation.get("source") or "Unknown source"
             )
 
-            with st.expander(f"{index}. {document} — {section}"):
+            label = safe_expander_label(
+                f"{index}. {document} — {section}"
+            )
+            with st.expander(label):
                 left, right = st.columns(2)
 
                 left.caption("DOCUMENT")
@@ -395,8 +419,11 @@ def main():
             st.subheader("History")
 
             for index, item in enumerate(history[1:], start=1):
+                history_label = safe_expander_label(
+                    f"{index}. {item['question']}"
+                )
                 with st.expander(
-                    f"{index}. {item['question']}",
+                    history_label,
                     expanded=False,
                 ):
                     render_response(item["response"])
