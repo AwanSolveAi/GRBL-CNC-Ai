@@ -99,7 +99,7 @@ def render_sidebar(assistant):
 
         st.divider()
         st.markdown(
-            '<div class="brand-note"><strong>TechSolAi</strong><br>'
+            '<div class="brand-note"><strong>AwanSolveAi</strong><br>'
             '<small>AI Solutions for Technical Knowledge</small></div>',
             unsafe_allow_html=True,
         )
@@ -237,7 +237,6 @@ def render_sources(citations):
             )
 
 
-
 def render_response(response):
     validation = response.get("validation", {})
     evidence = validation.get("level", "UNKNOWN")
@@ -294,7 +293,7 @@ def render_response(response):
 
 def main():
     st.set_page_config(
-        page_title="GRBL CNC AI",
+        page_title="AwanSolveAi GRBL CNC AI",
         page_icon="G",
         layout="centered",
     )
@@ -312,7 +311,7 @@ def main():
         st.caption("Grounded answers from GRBL documentation.")
 
     with brand:
-        st.caption("TechSolAi")
+        st.caption("AwanSolveAi")
 
     st.write("")
 
